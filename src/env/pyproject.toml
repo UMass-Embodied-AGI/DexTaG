@@ -1,0 +1,30 @@
+[project]
+name = "gs-env"
+version = "0.0.1"
+description = "Genesis simulation environments for Genesis Playground."
+requires-python = ">=3.10"
+dependencies = [
+  "fire>=0.7.0",
+  "genesis-world ; sys_platform != 'linux' or platform_machine != 'aarch64'",
+  "gs-agent",
+  "gs-schemas",
+  "numpy>=2.2.5",
+  "scipy>=1.11.0",
+  "torch>=2.6.0",
+]
+
+[dependency-groups]
+dev = [
+  "fire>=0.7.0",
+  "pre-commit>=4.3.0",
+  "pyright[nodejs]>=1.1.404",
+  "pytest-timeout>=2.4.0",
+  "pytest>=8.4.1",
+  "ruff>=0.12.10",
+]
+
+[build-system]
+requires = [
+  "hatchling",
+]
+build-backend = "hatchling.build"

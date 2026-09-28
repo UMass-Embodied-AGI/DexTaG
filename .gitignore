@@ -1,0 +1,15 @@
+.DS_Store
+__pycache__
+*.egg-info
+logs
+deploy
+.vscode/
+submit.sh
+
+motion/
+
+*.mp4
+*.pkl
+*.zip
+experiments
+data
