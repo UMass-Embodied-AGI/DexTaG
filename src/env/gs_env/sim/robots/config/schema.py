@@ -64,7 +64,7 @@ class ManipulatorRobotArgs(BaseModel):
     vis_mode: str
     ctrl_type: CtrlType
     ik_solver: IKSolver
-    ee_link_name: str
+    ee_link_name: str  # Wrist link (hand root); demo wrist poses are this link's pose
     show_target: bool
     gripper_link_names: list[str]
     default_arm_dof: dict[str, float]
@@ -78,6 +78,8 @@ class ManipulatorRobotArgs(BaseModel):
     dof_kd: dict[str, float]
     dof_max_force: float | list[float]
     tcp_yaw: float | None = None  # TCP yaw for IK (rad); xArm7 + WUJI right hand: 2.3562
+    # TCP position for IK: arm flange (link_eef) to wrist link, in meters
+    tcp_offset: tuple[float, float, float] = (0.0, 0.0, 0.057)
     # Tactile sensor files (robot-side: geometry depends on hand morphology)
     tactile_grid_path: str | None = None
     tactile_pixel_mapping_path: str | None = None

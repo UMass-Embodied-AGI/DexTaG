@@ -89,7 +89,8 @@ class SingleHandRetargetingEnvArgs(EnvArgs):
     tactile_kn: float = 3000.0
     tactile_kt: float = 200.0
     tactile_mu: float = 1.0
-    # Links carrying fingertip tactile geometry in the v5 URDF (used for fingertip-to-surface SDF queries).
+    # Fingertip links with tactile points: used for fingertip-to-surface SDF queries and the
+    # fingertip pixel masks/weights of the tactile reward (row i = link i).
     tactile_fingertip_link_names: list[str] = [
         "finger1_link4", "finger2_link4", "finger3_link4",
         "finger4_link4", "finger5_link4",
@@ -116,18 +117,12 @@ class SingleHandRetargetingEnvArgs(EnvArgs):
     is_student: bool = False
     proprio_terms_student: list[str] | None = None
     target_motion_terms_student: list[str] | None = None
-    # Target visualization mode for eval: "ghost_hand", "fingertip_markers", "target_object", or None
     target_visualization: str | None = None
-    # Object guide: use control_dofs_position to guide the object's translational DOFs
-    # toward the reference trajectory. kp/kv decay linearly over training steps.
-    # Set decay_steps to 0 to disable.
+    # Object guide: use control_dofs_position to guide the object's translational DOFstoward the reference trajectory. 
     object_guide_force_decay_steps: int = 0  # Number of training steps over which kp/kv decay to 0
     object_guide_force_kp: float = 1.0  # 0.5 seems to be the minimum for pen lifting
     skip_trajectories: list[str] = []  # Trajectory filenames to skip during loading
     # Train/eval split (deterministic, by trajectory ID prefix before "__"):
-    # split_key = traj_file.stem.split("__")[0]; bucket = md5(split_key) -> [0, 1).
-    # split_mode="train" keeps bucket < train_ratio; "eval" keeps bucket >= train_ratio;
-    # "all" disables the split. Applied on top of skip_trajectories.
     train_ratio: float = 1.0
     split_mode: Literal["train", "eval", "all"] = "all"
     # Salts the split hash so different seeds give different train/eval partitions.

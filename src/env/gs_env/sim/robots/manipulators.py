@@ -323,15 +323,15 @@ class XArmWUJIHand(ManipulatorBase):
     ) -> None:
         super().__init__(num_envs=num_envs, scene=scene, args=args, device=device)
 
-        # Initialize IK solver with TCP offset for WujiHand palm.
-        # TCP yaw matches the wujihand_fix joint yaw in xarm7_with_wujihand_v5.urdf
-        # (2.3562 rad = 135deg).
+        # Initialize IK solver with the TCP at the wrist link (args.tcp_offset, args.tcp_yaw).
+        # For WUJI these match the wujihand_fix joint in xarm7_with_wujihand_v5.urdf
+        # (xyz 0 0 0.057, yaw 2.3562 rad = 135deg).
         if args.tcp_yaw is None:
             raise ValueError(
                 "XArmWUJIHand requires args.tcp_yaw to be set (2.3562 for the WUJI right hand)."
             )
         self._ik_solver = XArm7Kinematics(
-            tcp_offset=[0, 0, 57, 0, 0, args.tcp_yaw],
+            tcp_offset=[*(v * 1000.0 for v in args.tcp_offset), 0, 0, args.tcp_yaw],  # m -> mm
         )
 
         # Store arm base position for coordinate transforms (morph position)
@@ -347,8 +347,8 @@ class XArmWUJIHand(ManipulatorBase):
     def post_build_init(self, eval_mode: bool = False) -> None:
         """Initialize limits and constraints after scene is built."""
         super().post_build_init(eval_mode=eval_mode)
-        # Cache palm_link index for base_* property queries
-        self._wrist_link_idx = self._robot_entity.get_link("palm_link").idx_local
+        # Cache wrist link index for base_* property queries
+        self._wrist_link_idx = self._robot_entity.get_link(self._args.ee_link_name).idx_local
         # Cache arm link local indices for contact queries
         self._arm_link_idx_local = [
             self._robot_entity.get_link(name).idx_local

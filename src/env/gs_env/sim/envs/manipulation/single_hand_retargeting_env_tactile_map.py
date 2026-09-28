@@ -130,48 +130,6 @@ class SingleHandRetargetingEnvTactileMap(BaseEnv):
             vis_mode="visual"
         )
 
-        # == Target visualization (controlled by --env.target_visualization) ==
-        self._ghost_hand = None
-        self._fingertip_markers = []
-        self._target_object = None
-        vis_mode = self._args.target_visualization
-        if self._eval_mode and self._show_viewer and vis_mode is not None:
-            if vis_mode == "ghost_hand":
-                ghost_morph = gs.morphs.URDF(
-                    file="assets/robot/xarm/wujihand_right_v5.urdf",
-                    merge_fixed_links=False,
-                    pos=args.robot_args.morph_args.pos,
-                    euler=args.robot_args.morph_args.euler,
-                    fixed=args.robot_args.morph_args.fixed,
-                    is_free=args.robot_args.morph_args.is_free,
-                    collision=False,
-                    recompute_inertia=True
-                )
-                self._ghost_hand = self._scene.scene.add_entity(
-                    morph=ghost_morph,
-                    vis_mode="visual",
-                )
-            elif vis_mode == "fingertip_markers":
-                for _ in range(5):
-                    marker = self._scene.scene.add_entity(
-                        gs.morphs.Mesh(
-                            file="assets/scene/axis.obj",
-                            scale=0.02,
-                            collision=False,
-                        ),
-                    )
-                    self._fingertip_markers.append(marker)
-            elif vis_mode == "target_object":
-                self._target_object = self._scene.scene.add_entity(
-                    gs.morphs.Mesh(
-                        file=f"{obj_cfg.trajectory_path}/{obj_id}_collision.obj",
-                        pos=[0.0, 0.0, 0.0],
-                        euler=(90, 0, 0),
-                        scale=1.0,
-                        collision=False,
-                    ),
-                )
-
         # == set up wrist camera (GUI window only in eval with viewer + use_wrist_depth_camera) ==
         self._wrist_camera = self._scene.scene.add_camera(
             res=self._args.wrist_depth_camera_resolution,
@@ -554,7 +512,6 @@ class SingleHandRetargetingEnvTactileMap(BaseEnv):
             if link_name in self._tactile_points:
                 local_pts = self._tactile_points[link_name]  # (N, 3) numpy
                 centroid = local_pts.mean(axis=0)  # (3,)
-                assert "v5.urdf" in self._args.robot_args.morph_args.file
                 centroid[2] += self._args.fingertip_tactile_center_z_offset
                 dists = np.linalg.norm(local_pts - centroid, axis=1)
                 closest_idx = int(np.argmin(dists))
@@ -1729,28 +1686,6 @@ class SingleHandRetargetingEnvTactileMap(BaseEnv):
 
         self.update_buffers()
 
-        # === Update target visualization markers ===
-        vis_mode = self._args.target_visualization
-        if self._eval_mode and self._show_viewer and vis_mode is not None:
-            env_indices = torch.arange(self.num_envs, device=self._device)
-            if vis_mode == "ghost_hand" and self._ghost_hand is not None:
-                self._ghost_hand.set_pos(self.target_wrist_pos, envs_idx=env_indices)
-                self._ghost_hand.set_quat(self.target_wrist_quat, envs_idx=env_indices)
-                self._ghost_hand.set_dofs_position(
-                    self.target_hand_dof_pos,
-                    dofs_idx_local=[idx - 7 for idx in self._robot._hand_dof_idx_local],
-                    envs_idx=env_indices,
-                )
-            elif vis_mode == "fingertip_markers" and self._fingertip_markers:
-                tgt_pos = self.target_mano_joint_pos.reshape(self.num_envs, 5, 3)
-                tgt_quat = self.target_mano_joint_quat.reshape(self.num_envs, 5, 4)
-                for i, marker in enumerate(self._fingertip_markers):
-                    marker.set_pos(tgt_pos[:, i, :], envs_idx=env_indices)
-                    marker.set_quat(tgt_quat[:, i, :], envs_idx=env_indices)
-            elif vis_mode == "target_object" and self._target_object is not None:
-                self._target_object.set_pos(self.target_object_pos, envs_idx=env_indices)
-                self._target_object.set_quat(self.target_object_quat, envs_idx=env_indices)
-
     def step(
         self, action: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, dict[str, Any]]:
@@ -1974,23 +1909,16 @@ class SingleHandRetargetingEnvTactileMap(BaseEnv):
         pass
 
     def _build_fingertip_pixel_masks(self, h: int, w: int) -> torch.Tensor:
-        """Build a (5, h*w) boolean mask: row i marks pixels belonging to fingertip i."""
-        tip_link_groups = [
-            ["finger1_link4"],
-            ["finger2_link4"],
-            ["finger3_link4"],
-            ["finger4_link4"],
-            ["finger5_link4"],
-        ]
-        masks = torch.zeros((5, h * w), dtype=torch.bool, device=self._device)
+        """Build a (num_tips, h*w) boolean mask: row i marks pixels of tactile_fingertip_link_names[i]."""
+        tip_links = self._args.tactile_fingertip_link_names
+        masks = torch.zeros((len(tip_links), h * w), dtype=torch.bool, device=self._device)
         per_link_mapping = self._tactile_map_converter._pixel_mapping["per_link_mapping"]
-        for i, link_names in enumerate(tip_link_groups):
-            for link_name in link_names:
-                if link_name not in per_link_mapping:
-                    continue
-                for _local_idx, info in per_link_mapping[link_name].items():
-                    r, c = info["pixel"]
-                    masks[i, r * w + c] = True
+        for i, link_name in enumerate(tip_links):
+            if link_name not in per_link_mapping:
+                continue
+            for _local_idx, info in per_link_mapping[link_name].items():
+                r, c = info["pixel"]
+                masks[i, r * w + c] = True
         print(f"Fingertip pixel masks: {masks.sum(dim=-1).tolist()} pixels per finger")
         return masks
 
@@ -2003,9 +1931,7 @@ class SingleHandRetargetingEnvTactileMap(BaseEnv):
         """
         weights = torch.ones(h * w, device=self._device)
 
-        tip_links = [
-            "finger1_link4", "finger2_link4", "finger3_link4", "finger4_link4", "finger5_link4",
-        ]
+        tip_links = self._args.tactile_fingertip_link_names
 
         per_link_mapping = self._tactile_map_converter._pixel_mapping["per_link_mapping"]
         tip_pixels: set[tuple[int, int]] = set()
@@ -2074,10 +2000,7 @@ class SingleHandRetargetingEnvTactileMap(BaseEnv):
 
         for link_name in sensor_link_names:
             link_data = links_data[link_name]
-            if link_name == "base":
-                link_idx_local = self.robot.get_link("palm_link").idx_local
-            else:
-                link_idx_local = self.robot.get_link(link_name).idx_local
+            link_idx_local = self.robot.get_link(link_name).idx_local
             num_points = link_data['num_points']
             local_positions = self._tactile_points[link_name]
 

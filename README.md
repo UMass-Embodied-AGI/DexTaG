@@ -20,7 +20,7 @@ policy is then distilled into a controller that runs on a real xArm7 with a WUJI
 hand, without any tactile input.
 
 This repository contains the simulation training, built on
-[Genesis](https://github.com/Genesis-Embodied-AI/Genesis):
+[Genesis](https://github.com/hanyangclarence/Genesis/tree/yh-041-tactile-map):
 
 - **Retargeter (teacher):** trained with reinforcement learning on all recorded
   demonstrations of one object, with rewards for matching the glove's tactile readings.
@@ -28,7 +28,7 @@ This repository contains the simulation training, built on
   trajectory using only what the real robot can sense.
 
 The simulated tactile sensor comes from our
-[Genesis fork](https://github.com/hanyangclarence/Genesis), which the install step
+[Genesis fork](https://github.com/hanyangclarence/Genesis/tree/yh-041-tactile-map), which the install step
 pulls in automatically.
 
 ## Install
@@ -105,6 +105,72 @@ The student's environment is built from the retargeter's saved configuration
 (object, rewards, and hand setup), so those settings don't need to be repeated.
 To evaluate the student, rerun the same command with
 `--eval=True --save_trajectory=True --num_runs_per_traj=1 --use_wandb=False`.
+
+## Adding a new embodiment
+
+The code targets an xArm7 with a WUJI hand. Using another dexterous hand on the
+xArm7 takes a robot model, tactile files for the hand, demonstrations retargeted to
+it, and two config entries.
+
+**1. Robot model.** Build a URDF of the arm with your hand attached to the arm's
+flange (`link_eef`) by a fixed joint. Put it under
+`assets/robot/`.
+
+**2. Tactile points and pixel mapping.** Place tactile points on the hand and map
+them onto the glove's 24x32 tactile map with the tactile pipeline in our
+[Genesis fork](https://github.com/hanyangclarence/Genesis/tree/yh-041-tactile-map),
+passing your URDF with `--urdf`. Before the mapping step, add your hand's links to
+`examples/tactile/tactile_layout.py`, which places each link in the 2D view you
+pair with glove pixels. The pipeline produces a tactile grid and a pixel mapping
+(two JSON files).
+
+**3. Demonstrations.** Retarget the glove recordings to your hand. Our data is
+retargeted to the WUJI hand, but it keeps the human wrist and fingertip
+trajectories, so you can retarget from those with your own pipeline. Each `.pkl` needs:
+- `hand_trajectory`: `wrist_positions` and `wrist_rotations_aa` (the world pose of
+  the hand's root link), and `dof_positions` (hand joint angles, in the joint order
+  of your robot config);
+- `object_trajectory.pose_matrices`, `mano_reference` (fingertip positions and
+  orientations), `tactile_map`, and `metadata.obj_id`;
+- the object mesh `<obj_id>_collision.obj` in the same folder.
+
+**4. Robot config.** In `src/env/gs_env/sim/robots/config/registry.py`, add an entry
+modeled on `xarm_wuji_hand`:
+- the URDF path;
+- the hand joints and their default angles (`default_gripper_dof`);
+- joint gains and force limits;
+- `ee_link_name`, the hand's root link;
+- `tcp_offset` and `tcp_yaw`, the hand root's pose relative to the arm flange;
+- the two tactile JSON paths.
+
+**5. Environment config.** In `src/env/gs_env/sim/envs/config/registry.py`, copy
+`single_hand_retargeting_tactile_map_xarm` with your robot entry. Set:
+- `joint_mapping`, from each demonstration fingertip to your fingertip link;
+- `tactile_fingertip_link_names`;
+- the per-finger reward settings.
+
+If the number of hand joints changes, also update the network input sizes in
+`src/agent/gs_agent/modules/config/registry.py`; the comments show how each is
+computed.
+
+Then train with your environment entry:
+
+```bash
+python scripts/policy/run_ppo_single_hand_retargeting.py \
+    --env_name=my_hand_env --exp_name=my_hand --object_name=marker_pen \
+    --env.object_config.trajectory_path=/path/to/my_hand/pickles_filtered
+```
+
+**Harder cases.**
+- **A hand without exactly five fingertips:** the environment's fingertip checks and
+  the fingertip rewards assume five fingertips.
+- **An arm other than the xArm7:** the arm's IK uses the bundled xArm7 library. It
+  only places the arm at the first frame of each episode, but a new arm still needs a
+  robot class with its own IK. The arm's
+  link names (used to detect arm contact) and the wrist camera's link also need
+  updating.
+- **The visualization scripts:** the xArm7 and WUJI joint names and URDFs are set at
+  the top of each script.
 
 ## Acknowledgements
 

@@ -207,6 +207,7 @@ RobotArgsRegistry["xarm_wuji_hand"] = ManipulatorRobotArgs(
     dof_kd=XARM_WUJI_kd_dict,
     dof_max_force=[10000.0] * 7 + [10000.0, 10000.0, 10000.0, 10000.0] * 5,  # sequence following all_dof_idx_local
     tcp_yaw=2.3562,  # 135deg, matches wujihand_fix yaw in xarm7_with_wujihand_v5.urdf
+    tcp_offset=(0.0, 0.0, 0.057),  # matches wujihand_fix xyz in xarm7_with_wujihand_v5.urdf
     tactile_grid_path="assets/robot/wujihand-urdf/full_hand_tactile_v5.json",
     tactile_pixel_mapping_path="assets/robot/wujihand-urdf/tactile_pixel_mapping_v5.json",
 )
