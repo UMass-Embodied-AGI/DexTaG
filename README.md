@@ -121,8 +121,10 @@ them onto the glove's 24x32 tactile map with the tactile pipeline in our
 [Genesis fork](https://github.com/hanyangclarence/Genesis/tree/yh-041-tactile-map),
 passing your URDF with `--urdf`. Before the mapping step, add your hand's links to
 `examples/tactile/tactile_layout.py`, which places each link in the 2D view you
-pair with glove pixels. The pipeline produces a tactile grid and a pixel mapping
-(two JSON files).
+pair with glove pixels. The pipeline produces a tactile grid,
+`full_hand_tactile.json`, and a pixel mapping, `tactile_pixel_mapping.json` (for the
+WUJI hand: `assets/robot/wujihand-urdf/full_hand_tactile_v5.json` and
+`tactile_pixel_mapping_v5.json`).
 
 **3. Demonstrations.** Retarget the glove recordings to your hand. Our data is
 retargeted to the WUJI hand, but it keeps the human wrist and fingertip
@@ -141,7 +143,8 @@ modeled on `xarm_wuji_hand`:
 - joint gains and force limits;
 - `ee_link_name`, the hand's root link;
 - `tcp_offset` and `tcp_yaw`, the hand root's pose relative to the arm flange;
-- the two tactile JSON paths.
+- the paths to `full_hand_tactile.json` (`tactile_grid_path`) and
+  `tactile_pixel_mapping.json` (`tactile_pixel_mapping_path`).
 
 **5. Environment config.** In `src/env/gs_env/sim/envs/config/registry.py`, copy
 `single_hand_retargeting_tactile_map_xarm` with your robot entry. Set:
